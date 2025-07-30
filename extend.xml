@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<EtherCATInfo>
+  <Descriptions>
+    <Devices>
+      <Device>
+        <Type>
+          <Identity>
+            <VendorID>0x87654321</VendorID>
+            <ProductCode>0x0000000A</ProductCode>
+          </Identity>
+        </Type>
+        <Name>AdvancedDexHand</Name>
+        <Joints>
+          <Joint name="Thumb_Flex"/>
+          <Joint name="Thumb_Abduct"/>
+          <Joint name="Index_1"/>
+          <Joint name="Index_2"/>
+          <Joint name="Middle_1"/>
+          <Joint name="Middle_2"/>
+          <Joint name="Ring_1"/>
+          <Joint name="Ring_2"/>
+          <Joint name="Little_1"/>
+          <Joint name="Little_2"/>
+          <Joint name="Palm_Spread"/>
+          <Joint name="Wrist_Rotate"/>
+        </Joints>
+      </Device>
+    </Devices>
+  </Descriptions>
+</EtherCATInfo>

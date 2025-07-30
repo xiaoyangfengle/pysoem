@@ -1,0 +1,28 @@
+<EtherCATInfo>
+  <Descriptions>
+    <Devices>
+      <Device>
+        <Name>JointController1</Name>
+        <RxPdo>
+          <Entry>
+            <Name>Joint_0</Name>
+          </Entry>
+          <Entry>
+            <Name>Joint_1</Name>
+          </Entry>
+        </RxPdo>
+      </Device>
+      <Device>
+        <Name>JointController2</Name>
+        <RxPdo>
+          <Entry>
+            <Name>Joint_2</Name>
+          </Entry>
+          <Entry>
+            <Name>Joint_3</Name>
+          </Entry>
+        </RxPdo>
+      </Device>
+    </Devices>
+  </Descriptions>
+</EtherCATInfo>

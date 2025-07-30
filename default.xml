@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<EtherCATInfo>
+  <Descriptions>
+    <Devices>
+      <Device>
+        <Type>
+          <Identity>
+            <VendorID>0x12345678</VendorID>
+            <ProductCode>0x00000001</ProductCode>
+          </Identity>
+        </Type>
+        <Name>BasicDexHand</Name>
+        <Joints>
+          <Joint name="Thumb"/>
+          <Joint name="Index"/>
+          <Joint name="Middle"/>
+          <Joint name="Ring"/>
+          <Joint name="Little"/>
+        </Joints>
+      </Device>
+    </Devices>
+  </Descriptions>
+</EtherCATInfo>

@@ -1,0 +1,16 @@
+<EtherCATInfo>
+  <Descriptions>
+    <Devices>
+      <Device>
+        <Name>DexHandBoard</Name>
+        <RxPdo>
+          <Entry><Name>Thumb</Name></Entry>
+          <Entry><Name>Index</Name></Entry>
+          <Entry><Name>Middle</Name></Entry>
+          <Entry><Name>Ring</Name></Entry>
+          <Entry><Name>Pinky</Name></Entry>
+        </RxPdo>
+      </Device>
+    </Devices>
+  </Descriptions>
+</EtherCATInfo>

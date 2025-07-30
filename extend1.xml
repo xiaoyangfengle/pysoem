@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<EtherCATInfo>
+  <Descriptions>
+    <Devices>
+      <Device>
+        <Type>
+          <Identity>
+            <VendorID>0xABCDEF01</VendorID>
+            <ProductCode>0x0000000F</ProductCode>
+          </Identity>
+        </Type>
+        <Name>GenericDexterousHand</Name>
+        <NumJoints>8</NumJoints>
+      </Device>
+    </Devices>
+  </Descriptions>
+</EtherCATInfo>

@@ -1,0 +1,11 @@
+<ESI>
+  <Descriptions>
+    <Groups>
+      <Group>
+        <Joint name="Joint_0" slave_index="0" channel_index="0"/>
+        <Joint name="Joint_1" slave_index="0" channel_index="1"/>
+        <Joint name="Joint_2" slave_index="1" channel_index="0"/>
+      </Group>
+    </Groups>
+  </Descriptions>
+</ESI>
