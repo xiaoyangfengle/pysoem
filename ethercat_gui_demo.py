@@ -2,16 +2,20 @@ import sys
 import threading
 import pysoem
 import xml.etree.ElementTree as ET
+import argparse
+import json
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget,
     QSlider, QMessageBox, QComboBox, QHBoxLayout, QGroupBox, QGridLayout,
     QFileDialog, QGraphicsScene, QGraphicsView, QGraphicsEllipseItem, QSplitter
 )
 from PySide6.QtCore import QTimer, Qt, QRectF
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QPen, QBrush, QColor
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL.GL import *
 from OpenGL.GLU import *
+#from OpenGL.GLUT import glutInit, glutSolidCube
+from hand3d_widget import Hand3DWidget
 
 
 class EtherCATJoint:
@@ -44,6 +48,12 @@ class DexterousHandModel:
     def write_to_master(self, master):
         for joint in self.joints:
             joint.write_position(master, joint.value)
+
+    def load_from_config(self, config_data):
+        self.joints.clear()
+        for entry in config_data.get("joints", []):
+            joint = EtherCATJoint(entry["slave_index"], entry["channel_index"], entry.get("name", "Joint"))
+            self.add_joint(joint)
 
 
 class EtherCATMaster:
@@ -115,7 +125,7 @@ class EtherCATMaster:
 class Hand3DWidget(QOpenGLWidget):
     def __init__(self):
         super().__init__()
-        self.joint_angles = [0.0 for _ in range(5)]
+        self.joint_angles = [0.0 for _ in range(20)]
 
     def initializeGL(self):
         glEnable(GL_DEPTH_TEST)
@@ -131,15 +141,33 @@ class Hand3DWidget(QOpenGLWidget):
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
-        gluLookAt(0, 0, 20, 0, 0, 0, 0, 1, 0)
+
+        # 设置摄像机视角，更俯视角度
+        gluLookAt(0, 20, 60, 0, 0, 0, 0, 1, 0)
+
+        self.draw_palm()
 
         for i, angle in enumerate(self.joint_angles):
             glPushMatrix()
-            glTranslatef(-8 + i * 4, 0, 0)
+
+            # 假设是 2 只手，每手 5 个关节
+            base_x = -8 + (i % 5) * 4
+            base_y = 0
+            base_z = -5 + (i // 5) * 10
+
+            glTranslatef(base_x, base_y, base_z)
             glRotatef(angle, 1, 0, 0)
-            glColor3f(0.5, 0.8, 1.0)
+            glColor3f(0.7, 0.9, 1.0)
             self.draw_finger()
             glPopMatrix()
+
+    def draw_palm(self):
+        glPushMatrix()
+        glTranslatef(0, -2, 0)
+        glScalef(10, 1, 4)
+        #glutSolidCube(1)
+        glPopMatrix()
+
 
     def draw_finger(self):
         glBegin(GL_QUADS)
@@ -206,6 +234,8 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.update_inputs)
 
         self.populate_adapters()
+        
+        self.showMaximized()    # 最大化窗口
 
     def populate_adapters(self):
         adapters = self.master.find_adapters()
@@ -228,51 +258,91 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "连接失败", str(e))
 
     def load_esi_config(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "选择 ESI 配置文件", "", "ESI Files (*.xml)")
-        if file_path:
-            try:
+        file_path, _ = QFileDialog.getOpenFileName(self, "选择 ESI 或 JSON 配置文件", "", "Config Files (*.xml *.json)")
+        if not file_path:
+            return
+
+        try:
+            if file_path.endswith(".json"):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+                    self.hand_model.load_from_config(config_data)
+                    QMessageBox.information(self, "配置成功", "已从 JSON 配置加载关节")
+            else:
                 tree = ET.parse(file_path)
                 root = tree.getroot()
-                for dev in root.findall(".//Device"):
-                    vendor_id = dev.findtext("Type/Identity/VendorID")
-                    product_code = dev.findtext("Type/Identity/ProductCode")
-                    print(f"ESI 设备: Vendor={vendor_id}, Product={product_code}")
-                QMessageBox.information(self, "ESI 加载", "ESI 配置加载成功")
-            except Exception as e:
-                QMessageBox.critical(self, "加载失败", str(e))
+
+                joints = []
+                for i, dev in enumerate(root.findall(".//Descriptions/Devices/Device")):
+                    name = dev.findtext("Name", f"Joint_{i}")
+                    mapping_entries = dev.findall(".//RxPdo/Entry")
+                    for j, entry in enumerate(mapping_entries):
+                        joint = {
+                            "slave_index": i,
+                            "channel_index": j,
+                            "name": entry.findtext("Name", name + f"_{j}")
+                        }
+                        joints.append(joint)
+
+                # 兼容查找 <Descriptions><Groups><Group><Joint> 节点结构
+                if not joints:
+                    for joint_elem in root.findall(".//Descriptions/Groups/Group/Joint"):
+                        joint = {
+                            "slave_index": int(joint_elem.attrib.get("slave_index", 0)),
+                            "channel_index": int(joint_elem.attrib.get("channel_index", 0)),
+                            "name": joint_elem.attrib.get("name", "Joint")
+                        }
+                        joints.append(joint)
+
+                if joints:
+                    config_data = {"joints": joints}
+                    self.hand_model.load_from_config(config_data)
+                    self.create_slave_controls() # 创建关节控制界面
+                    QMessageBox.information(self, "配置成功", f"已从 ESI 文件配置 {len(joints)} 个关节")
+                else:
+                    QMessageBox.warning(self, "警告", "未在 ESI 文件中找到关节映射，已跳过")
+
+        except Exception as e:
+            QMessageBox.critical(self, "加载失败", str(e))
 
     def create_slave_controls(self):
-        for i, slave in enumerate(self.master.slaves):
-            for j in range(2):
-                joint = EtherCATJoint(i, j, name=f"Joint_{i}_{j}")
-                self.hand_model.add_joint(joint)
+    # 清空旧控件（保持 layout 不变）
+        for i in reversed(range(self.slave_layout.count())):
+            item = self.slave_layout.itemAt(i)
+            widget = item.widget()
+            if widget:
+                widget.setParent(None)
 
-                slider = QSlider(Qt.Horizontal)
-                slider.setRange(0, 255)
-                slider.setValue(0)
-                slider.setEnabled(True)
-                slider.valueChanged.connect(lambda val, joint=joint: self.on_slider_change(joint, val))
+        self.sliders.clear()
+        self.output_labels.clear()
+        self.input_labels.clear()
 
-                output_label = QLabel(f"{joint.name} 输出值: 0")
-                input_label = QLabel(f"{joint.name} 输入值: 0")
+        for idx, joint in enumerate(self.hand_model.joints):
+            slider = QSlider(Qt.Horizontal)
+            slider.setRange(0, 255)
+            slider.setValue(joint.value)
+            slider.setEnabled(True)
+            slider.valueChanged.connect(lambda val, joint=joint, idx=idx: self.on_slider_change(joint, val, idx))
 
-                row = i * 2 + j
-                self.slave_layout.addWidget(QLabel(f"从机 {i} 通道 {j}"), row, 0)
-                self.slave_layout.addWidget(slider, row, 1)
-                self.slave_layout.addWidget(output_label, row, 2)
-                self.slave_layout.addWidget(input_label, row, 3)
+            output_label = QLabel(f"{joint.name} 输出值: {joint.value}")
+            input_label = QLabel(f"{joint.name} 输入值: {joint.value}")
 
-                self.sliders.append((joint, slider))
-                self.output_labels.append((joint, output_label))
-                self.input_labels.append((joint, input_label))
+            self.slave_layout.addWidget(QLabel(f"{joint.name}"), idx, 0)
+            self.slave_layout.addWidget(slider, idx, 1)
+            self.slave_layout.addWidget(output_label, idx, 2)
+            self.slave_layout.addWidget(input_label, idx, 3)
 
-    def on_slider_change(self, joint, value):
+            self.sliders.append((joint, slider))
+            self.output_labels.append((joint, output_label))
+            self.input_labels.append((joint, input_label))
+
+    def on_slider_change(self, joint, value, idx):
         for (j, label) in self.output_labels:
             if j == joint:
                 label.setText(f"{joint.name} 输出值: {value}")
+                
         joint.write_position(self.master, value)
-        if joint.slave_index == 0 and joint.channel_index < 5:
-            self.opengl_widget.set_joint_angle(joint.channel_index, value / 255 * 90)
+        self.opengl_widget.set_joint_angle(idx, value / 255 * 90)
 
     def update_inputs(self):
         for (joint, label) in self.input_labels:
@@ -281,11 +351,28 @@ class MainWindow(QMainWindow):
 
 
 def main():
-    simulation = '--simulate' in sys.argv
-    master = EtherCATMaster(simulation_mode=simulation)
+    parser = argparse.ArgumentParser(description="EtherCAT GUI for Dexterous Hand")
+    parser.add_argument('--simulate', action='store_true', help='Run in simulation mode without real EtherCAT devices')
+    parser.add_argument('--adapter', type=str, help='Specify adapter name to auto-connect')
+    args = parser.parse_args()
+
+    #glutInit()
+
+    master = EtherCATMaster(simulation_mode=args.simulate)
     app = QApplication(sys.argv)
     window = MainWindow(master)
     window.show()
+
+    if args.adapter:
+        try:
+            master.start(args.adapter)
+            window.connect_btn.setEnabled(False)
+            window.adapter_selector.setEnabled(False)
+            window.create_slave_controls()
+            window.timer.start(100)
+        except Exception as e:
+            QMessageBox.critical(window, "连接失败", str(e))
+
     exit_code = app.exec()
     master.stop()
     sys.exit(exit_code)
